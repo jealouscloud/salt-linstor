@@ -1,0 +1,17 @@
+---
+linstor:
+  cluster_glob: '*drbd*' # note: injection possible. prod should parse cluster from hostname
+  storage:
+      setup: # optional, prepare devices before setting up storage pools.
+        # list of device paths
+        devices: basename -a /sys/block/* | awk '/vdb/ {printf "/dev/%s\n", $0}' 
+        # command to run on the $devices device path list.
+        # add devices to volume group, then create a then LVM volume
+        command: vgcreate -y linstor_vg $devices; lvcreate -l 100%free -T linstor_vg/thin
+        # Only run command if the device isn't already setup
+        onlyif: for device in $devices; do pvs | grep -q "$device" || exit 0; done; exit 1
+      pools: # storage pools on node
+        # These are created with linstor storage-pool create
+        - type: lvmthin # some options: diskless, lvm, zfs, zfsthin, file
+          path: linstor_vg/thin
+          name: ha_pool
